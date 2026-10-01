@@ -1,11 +1,39 @@
 # MonitorLink
 
-**Low-latency secondary display streaming between Windows machines with dedicated monitor standby.**
+**Ultra-low-latency secondary display streaming between Windows machines with dedicated monitor standby.**
 
-MonitorLink turns a Windows laptop into a dedicated wireless or wired secondary monitor for a desktop PC. It handles screen capture via the DirectX DXGI Desktop Duplication API, advertises devices over local subnet beacons, and enters a borderless fullscreen receiver state on the client laptop with automatic system sleep prevention.
+Turn any spare Windows laptop into a high-refresh wireless or wired secondary monitor for your PC. Powered by DirectX DXGI Desktop Duplication and the Microsoft IddCx driver pipeline.
 
+[![Stars](https://img.shields.io/github/stars/Amirtheshwaran/MonitorLink?style=flat&color=yellow)](https://github.com/Amirtheshwaran/MonitorLink/stargazers)
+[![Forks](https://img.shields.io/github/forks/Amirtheshwaran/MonitorLink?style=flat&color=blue)](https://github.com/Amirtheshwaran/MonitorLink/network/members)
+[![Issues](https://img.shields.io/github/issues/Amirtheshwaran/MonitorLink?style=flat&color=green)](https://github.com/Amirtheshwaran/MonitorLink/issues)
+[![Discussions](https://img.shields.io/github/discussions/Amirtheshwaran/MonitorLink?style=flat&color=purple)](https://github.com/Amirtheshwaran/MonitorLink/discussions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue.svg)](#requirements-and-platform)
+
+---
+
+<p align="center">
+  <img src="assets/preview_ready.png" width="45%" alt="MonitorLink Ready State" />
+  &nbsp;&nbsp;
+  <img src="assets/preview_connected.png" width="45%" alt="MonitorLink Connected State" />
+</p>
+
+---
+
+## Why MonitorLink?
+
+Most existing solutions for using a laptop as a secondary screen are either proprietary, laggy, bloated with background services, or require purchasing HDMI dummy plugs:
+
+| Feature | MonitorLink | Spacedesk | Miracast ("Project to this PC") | Deskreen |
+| :--- | :---: | :---: | :---: | :---: |
+| **Open Source** | **Yes (MIT)** | No (Proprietary) | No (Windows only) | Yes (GPL-3.0) |
+| **Capture Pipeline** | **DirectX DXGI (60 FPS)** | Virtual Display Driver | Miracast Wi-Fi Direct | Electron / WebRTC |
+| **Latency** | **< 15ms (Wi-Fi) / < 5ms (Wired)** | ~30–50ms | Inconsistent (Stutters) | ~50–80ms |
+| **Setup Complexity** | **1-Click Auto-Discovery** | Multi-step installer | Frequent pairing failures | Web browser + QR code |
+| **Direct Cable Support** | **Yes (Gigabit Ethernet/USB)** | Manual IP setup | No (Wi-Fi Direct only) | Local network only |
+| **Dedicated Standby** | **Yes (`SetThreadExecutionState`)** | No | Full desktop | Browser window |
+| **True Extended Desktop** | **Included IddCx Driver** | Proprietary driver | Supported | Requires dummy plug |
 
 ---
 
@@ -17,7 +45,7 @@ MonitorLink turns a Windows laptop into a dedicated wireless or wired secondary 
 
 ### 2. Client machine (Laptop)
 1. Run `run_laptop.bat` (or `python MonitorLink.py --mode laptop`).
-2. The laptop automatically discovers the host on the local subnet and reports its readiness.
+2. The laptop automatically discovers the host on your Wi-Fi or wired connection.
 
 ### 3. Connect and disconnect
 - **To Link**: Click **Connect Display** on either device. The laptop immediately enters an edge-to-edge fullscreen monitor state, hides the local cursor, and renders the PC display feed at up to 60 FPS.
@@ -143,6 +171,16 @@ To generate a standalone portable build without requiring Python on the client l
 ```
 
 The compiled binary and dependencies will be written to `dist\MonitorLink\MonitorLink.exe`.
+
+---
+
+## 🌟 Community & Contributing
+
+If MonitorLink saved you from buying an expensive portable monitor, **please consider starring the repository** on GitHub! It helps the project reach more users and developers.
+
+- 💬 **Discussions**: Have questions, latency test results, or setup ideas? Join the [GitHub Discussions](https://github.com/Amirtheshwaran/MonitorLink/discussions)!
+- 🐛 **Issues**: Found a bug or compatibility issue with your GPU or Windows build? Open an [Issue](https://github.com/Amirtheshwaran/MonitorLink/issues).
+- 🤝 **Pull Requests**: Pull requests are welcome for new encoder optimizations, input capture improvements, and localized guides.
 
 ---
 
