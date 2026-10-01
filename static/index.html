@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MonitorLink - Wireless Secondary Display</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="hud" class="hud">
+        <div class="hud-left">
+            <span class="badge live-badge">LIVE</span>
+            <span id="status-text">Connected</span>
+            <span class="stat" id="fps-stat">0 FPS</span>
+            <span class="stat" id="ping-stat">0 ms</span>
+        </div>
+        <div class="hud-right">
+            <button id="fullscreen-btn" class="hud-btn">Fullscreen (F11)</button>
+            <button id="delink-btn" class="hud-btn delink-btn">❌ Delink</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="display-canvas"></canvas>
+    </div>
+
+    <div id="overlay" class="overlay">
+        <div class="overlay-card">
+            <div class="logo-icon">🖥️ ➔ 💻</div>
+            <h2>MonitorLink Web Receiver</h2>
+            <p id="overlay-msg">Connecting to PC screen stream...</p>
+            <div class="spinner" id="spinner"></div>
+            <button id="retry-btn" class="hud-btn" style="display:none; margin-top: 15px;">Reconnect</button>
+        </div>
+    </div>
+
+    <script src="receiver.js"></script>
+</body>
+</html>

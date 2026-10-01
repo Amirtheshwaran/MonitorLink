@@ -1,0 +1,8 @@
+PyQt6>=6.6.0
+bettercam>=1.0.0
+websockets>=12.0
+opencv-python>=4.8.0
+pywin32>=306
+zeroconf>=0.130.0
+psutil>=5.9.0
+pillow>=10.0.0
