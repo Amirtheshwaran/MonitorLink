@@ -17,6 +17,8 @@ build/
 # User local state
 config.json
 *.log
+*.zip
+release_notes.md
 
 # Windows thumbnail caches & desktop ini
 Thumbs.db
