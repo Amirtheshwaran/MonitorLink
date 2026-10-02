@@ -28,6 +28,17 @@ import win32gui
 import win32ui
 import win32con
 
+# Suppress harmless BetterCam __del__ AttributeError on unsupported feature levels
+try:
+    import bettercam.bettercam
+    _orig_bettercam_stop = bettercam.bettercam.BetterCam.stop
+    def _safe_bettercam_stop(self):
+        if getattr(self, "is_capturing", False):
+            return _orig_bettercam_stop(self)
+    bettercam.bettercam.BetterCam.stop = _safe_bettercam_stop
+except Exception:
+    pass
+
 
 
 class ScreenCapture:
