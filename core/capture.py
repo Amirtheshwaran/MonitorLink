@@ -81,11 +81,20 @@ class ScreenCapture:
     def _grab_gdi(self) -> np.ndarray | None:
         try:
             ensure_input_desktop()
-            hwnd = win32gui.GetDesktopWindow()
-            rect = win32gui.GetWindowRect(hwnd)
-            w = rect[2] - rect[0]
-            h = rect[3] - rect[1]
+            # Fetch target display position and dimensions for multi-monitor / extended setups
+            from core.virtual_display import VirtualDisplayManager
+            displays = VirtualDisplayManager.get_all_displays()
+            if 0 <= self.output_idx < len(displays):
+                target = displays[self.output_idx]
+                target_x = target.get("x", 0)
+                target_y = target.get("y", 0)
+                w = target.get("width", self.target_width)
+                h = target.get("height", self.target_height)
+            else:
+                target_x, target_y = 0, 0
+                w, h = self.target_width, self.target_height
 
+            hwnd = win32gui.GetDesktopWindow()
             hwndDC = win32gui.GetWindowDC(hwnd)
             mfcDC = win32ui.CreateDCFromHandle(hwndDC)
             saveDC = mfcDC.CreateCompatibleDC()
@@ -94,7 +103,7 @@ class ScreenCapture:
             saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
             saveDC.SelectObject(saveBitMap)
 
-            saveDC.BitBlt((0, 0), (w, h), mfcDC, (0, 0), win32con.SRCCOPY)
+            saveDC.BitBlt((0, 0), (w, h), mfcDC, (target_x, target_y), win32con.SRCCOPY)
 
             bmpinfo = saveBitMap.GetInfo()
             bmpstr = saveBitMap.GetBitmapBits(True)

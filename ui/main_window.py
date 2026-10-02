@@ -11,7 +11,7 @@ from PyQt6.QtGui import QCursor, QFont
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QDialog, QTabWidget, QFrame,
-    QMessageBox
+    QMessageBox, QComboBox
 )
 
 from core.virtual_display import VirtualDisplayManager
@@ -77,13 +77,18 @@ class SettingsDialog(QDialog):
         v_layout.addWidget(self.btn_install)
 
         h_box = QHBoxLayout()
+        def _toggle_and_refresh(enable: bool):
+            VirtualDisplayManager.toggle_virtual_display(enable)
+            if parent and hasattr(parent, "_refresh_display_list"):
+                QTimer.singleShot(800, parent._refresh_display_list)
+
         btn_en = QPushButton("Enable Virtual Screen", self)
         btn_en.setProperty("class", "GhostBtn")
-        btn_en.clicked.connect(lambda: VirtualDisplayManager.toggle_virtual_display(True))
+        btn_en.clicked.connect(lambda: _toggle_and_refresh(True))
 
         btn_dis = QPushButton("Disable Virtual Screen", self)
         btn_dis.setProperty("class", "GhostBtn")
-        btn_dis.clicked.connect(lambda: VirtualDisplayManager.toggle_virtual_display(False))
+        btn_dis.clicked.connect(lambda: _toggle_and_refresh(False))
 
         h_box.addWidget(btn_en)
         h_box.addWidget(btn_dis)
@@ -134,7 +139,7 @@ class MainWindow(QMainWindow):
     def __init__(self, initial_mode: str = "pc"):
         super().__init__()
         self.setWindowTitle("MonitorLink")
-        self.setFixedSize(480, 390)
+        self.setFixedSize(480, 440)
         self.setStyleSheet(PRO_THEME_QSS)
 
 
@@ -225,6 +230,53 @@ class MainWindow(QMainWindow):
         self.device_card = DeviceCard(parent=self)
         main_layout.addWidget(self.device_card)
 
+        # Display Source Selector (visible when role == "pc")
+        self.display_row = QWidget(self)
+        disp_layout = QHBoxLayout(self.display_row)
+        disp_layout.setContentsMargins(4, 0, 4, 0)
+        disp_layout.setSpacing(8)
+
+        disp_lbl = QLabel("STREAM DISPLAY:", self.display_row)
+        disp_lbl.setStyleSheet("color: #71717a; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        disp_layout.addWidget(disp_lbl)
+
+        self.display_combo = QComboBox(self.display_row)
+        self.display_combo.setFixedHeight(30)
+        self.display_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #181a20;
+                color: #e4e4e7;
+                border: 1px solid #282b36;
+                border-radius: 6px;
+                padding: 2px 10px;
+                font-size: 12px;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #181a20;
+                color: #f4f4f5;
+                selection-background-color: #27272a;
+                border: 1px solid #282b36;
+                outline: none;
+            }
+        """)
+        self.display_combo.currentIndexChanged.connect(self._on_display_selected)
+        disp_layout.addWidget(self.display_combo, 1)
+
+        self.btn_refresh_displays = QPushButton("↻", self.display_row)
+        self.btn_refresh_displays.setFixedSize(30, 30)
+        self.btn_refresh_displays.setProperty("class", "GhostBtn")
+        self.btn_refresh_displays.setToolTip("Refresh connected displays")
+        self.btn_refresh_displays.clicked.connect(self._refresh_display_list)
+        disp_layout.addWidget(self.btn_refresh_displays)
+
+        main_layout.addWidget(self.display_row)
+        self.display_row.setVisible(self.current_role == "pc")
+        self._refresh_display_list()
+
         # Main Action Button (Connect / Disconnect)
         self.btn_action = QPushButton("Connect Display", self)
         self.btn_action.setFixedHeight(46)
@@ -249,6 +301,9 @@ class MainWindow(QMainWindow):
 
         self.btn_role_pc.setChecked(role == "pc")
         self.btn_role_laptop.setChecked(role == "laptop")
+        self.display_row.setVisible(role == "pc")
+        if role == "pc":
+            self._refresh_display_list()
         self._restart_services()
 
     def _init_services(self):
@@ -283,7 +338,10 @@ class MainWindow(QMainWindow):
 
     def _start_host_service(self):
         displays = VirtualDisplayManager.get_all_displays()
-        source_idx = 1 if len(displays) > 1 else 0
+        preferred = 1 if len(displays) > 1 else 0
+        source_idx = self.cfg.get("source_idx", preferred)
+        if source_idx >= len(displays):
+            source_idx = preferred
 
         self.host_streamer = HostStreamer(
             port=8765,
@@ -295,6 +353,37 @@ class MainWindow(QMainWindow):
         )
         self.host_streamer.set_source_display(source_idx)
         self.host_streamer.start()
+
+    def _refresh_display_list(self):
+        if not hasattr(self, "display_combo"):
+            return
+        self.display_combo.blockSignals(True)
+        self.display_combo.clear()
+        displays = VirtualDisplayManager.get_all_displays()
+        best_idx = 0
+        for i, d in enumerate(displays):
+            is_prim = d.get("is_primary", False)
+            w = d.get("width", 1920)
+            h = d.get("height", 1080)
+            label = f"Display {i+1}: {w}x{h} ({'Primary Screen' if is_prim else 'Extended / Virtual'})"
+            self.display_combo.addItem(label, i)
+            if not is_prim and best_idx == 0:
+                best_idx = i
+
+        chosen_idx = self.cfg.get("source_idx", best_idx)
+        if chosen_idx >= len(displays):
+            chosen_idx = best_idx
+        self.display_combo.setCurrentIndex(chosen_idx)
+        self.display_combo.blockSignals(False)
+
+    def _on_display_selected(self, combo_idx: int):
+        target_display_idx = self.display_combo.currentData()
+        if target_display_idx is None:
+            target_display_idx = combo_idx
+        self.cfg["source_idx"] = target_display_idx
+        save_config(self.cfg)
+        if self.host_streamer:
+            self.host_streamer.set_source_display(target_display_idx)
 
     def _start_standby_receiver_service(self):
         pass
