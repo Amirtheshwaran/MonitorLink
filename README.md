@@ -93,6 +93,37 @@ Most existing solutions for using a laptop as a secondary screen are either prop
 
 ---
 
+## 🗺️ Project Map & Architecture
+
+```
+MonitorLink/
+├── core/                       # Core system, capture & networking engines
+│   ├── capture.py              # Hardware DXGI Desktop Duplication & GDI capturer (BGR 60 FPS)
+│   ├── streamer.py             # WebSocket streaming server & frame broadcast loop
+│   ├── receiver.py             # Laptop client receiver & latency tracker
+│   ├── virtual_display.py      # Indirect Display Driver manager & Windows topology sorter
+│   ├── discovery.py            # Local UDP subnet beacon auto-discovery
+│   ├── input_handler.py        # Remote mouse & keyboard passthrough
+│   └── power_manager.py        # Win32 sleep suppression (SetThreadExecutionState)
+├── ui/                         # Clean desktop user interface (PyQt6)
+│   ├── main_window.py          # Dual-role dashboard (PC Sender / Laptop Receiver)
+│   ├── monitor_window.py       # Fullscreen edge-to-edge canvas with floating HUD
+│   ├── components.py           # Custom cards, hardware indicators, and SVG icons
+│   └── styles.py               # Dark pro theme stylesheet (QSS)
+├── driver/                     # Bundled Microsoft IddCx Virtual Display Driver
+│   ├── nefcon/                 # Driver installer utility (x64, x86, ARM64)
+│   └── VirtualDisplayDriver/   # Signed driver files, certificate, and resolution XML
+├── static/                     # Web receiver fallback for in-browser client (HTML/JS/CSS)
+├── assets/                     # Application icons, branding, and preview screenshots
+├── MonitorLink.py              # Application entry point & CLI parser
+├── install_driver.bat          # 1-click driver installation script (Elevated Admin)
+├── run_pc.bat                  # Sender mode quick launcher
+├── run_laptop.bat              # Receiver mode quick launcher
+└── build_exe.bat               # Standalone PyInstaller portable packaging script
+```
+
+---
+
 ## Display modes and Virtual Display Driver
 
 Windows requires an enumerated display device to provide an **Extended Desktop** workspace. If your host PC only has a single physical monitor, you have two options:
