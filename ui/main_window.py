@@ -300,8 +300,11 @@ class MainWindow(QMainWindow):
         pass
 
     def _connect_standby_receiver(self, ip: str):
-        if self.receiver_client and self.receiver_client.is_connected:
-            return
+        if self.receiver_client:
+            if self.receiver_client._running and self.receiver_client.host == ip:
+                return
+            self.receiver_client.stop()
+            self.receiver_client = None
 
         self.receiver_client = StreamReceiver(host=ip, port=8765)
         self.receiver_client.activate_requested.connect(self._on_activate_monitor_cmd)
@@ -438,6 +441,9 @@ class MainWindow(QMainWindow):
 
         target_roles = ("laptop", "receiver", "client") if self.current_role == "pc" else ("pc", "host", "sender")
         matching_peers = [p for p in self.discovered_peers.values() if p.get("role") in target_roles or p.get("role") == "both"]
+
+        # Prioritize routable LAN/Wi-Fi addresses over link-local APIPA (169.254.x.x)
+        matching_peers.sort(key=lambda p: (1 if p.get("ip", "").startswith("169.254.") else 0, p.get("ip", "")))
 
         if matching_peers:
             peer = matching_peers[0]

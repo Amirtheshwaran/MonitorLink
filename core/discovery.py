@@ -137,9 +137,13 @@ class DiscoveryService:
                 data, addr = sock.recvfrom(2048)
                 msg = json.loads(data.decode("utf-8"))
                 if msg.get("type") == "beacon" and is_opposite_role(self.role, msg.get("role", "")):
-                    key = f"{msg.get('ip')}:{msg.get('port')}"
+                    sender_ip = addr[0]
+                    if sender_ip.startswith("127."):
+                        continue
+                    key = f"{sender_ip}:{msg.get('port', self.service_port)}"
                     msg["last_seen"] = time.time()
-                    msg["remote_addr"] = addr[0]
+                    msg["remote_addr"] = sender_ip
+                    msg["ip"] = sender_ip
 
                     is_new = key not in self.discovered_devices
                     self.discovered_devices[key] = msg
