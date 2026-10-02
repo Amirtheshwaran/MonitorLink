@@ -53,11 +53,19 @@ def main():
     if hasattr(Qt.ApplicationAttribute, "AA_UseHighDpiPixmaps"):
         QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
 
+    from PyQt6.QtGui import QIcon
+
     app = QApplication(sys.argv)
     app.setApplicationName("MonitorLink")
     app.setOrganizationName("MonitorLink")
 
+    icon_path = os.path.join(BASE_DIR, "assets", "icon.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+
     window = MainWindow(initial_mode=args.mode)
+    if os.path.exists(icon_path):
+        window.setWindowIcon(QIcon(icon_path))
     window.show()
 
     logger.info(f"MonitorLink started in mode='{args.mode}'")
