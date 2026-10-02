@@ -9,6 +9,7 @@ import json
 import time
 import threading
 import logging
+import ipaddress
 import psutil
 
 logger = logging.getLogger(__name__)
@@ -17,25 +18,41 @@ DISCOVERY_PORT = 8766
 BEACON_INTERVAL = 1.0
 DEVICE_TIMEOUT = 3.5
 
+HOST_ROLES = {"pc", "host", "sender"}
+CLIENT_ROLES = {"laptop", "receiver", "client"}
+
+
+def is_opposite_role(r1: str, r2: str) -> bool:
+    """Return True if r1 and r2 represent complementary host/receiver roles."""
+    return (r1 in HOST_ROLES and r2 in CLIENT_ROLES) or (r1 in CLIENT_ROLES and r2 in HOST_ROLES)
+
 
 def get_local_ip_addresses() -> list[dict]:
-    """Get all non-loopback IPv4 addresses with their interface names and types."""
+    """Get all non-loopback IPv4 addresses with their interface names, types, and broadcast addresses."""
     results = []
     try:
         for iface, addrs in psutil.net_if_addrs().items():
             for addr in addrs:
                 if addr.family == socket.AF_INET and not addr.address.startswith("127."):
                     is_wired = any(k in iface.lower() for k in ["ethernet", "lan", "local area", "usb"])
+                    bcast = None
+                    if addr.netmask:
+                        try:
+                            net = ipaddress.IPv4Network(f"{addr.address}/{addr.netmask}", strict=False)
+                            bcast = str(net.broadcast_address)
+                        except Exception:
+                            pass
                     results.append({
                         "iface": iface,
                         "ip": addr.address,
+                        "bcast": bcast,
                         "type": "Wired (Ethernet/USB)" if is_wired else "Wi-Fi (Wireless)"
                     })
     except Exception as e:
         logger.error(f"Error enumerating local IP addresses: {e}")
 
     if not results:
-        results.append({"iface": "Default", "ip": "127.0.0.1", "type": "Loopback"})
+        results.append({"iface": "Default", "ip": "127.0.0.1", "bcast": "255.255.255.255", "type": "Loopback"})
     return results
 
 
@@ -93,7 +110,9 @@ class DiscoveryService:
                 payload = json.dumps(msg).encode("utf-8")
                 try:
                     sock.sendto(payload, ("<broadcast>", DISCOVERY_PORT))
-                    # Also try subnet broadcast
+                    if item.get("bcast"):
+                        sock.sendto(payload, (item["bcast"], DISCOVERY_PORT))
+                    # Also try naive /24 broadcast fallback
                     parts = ip.split(".")
                     if len(parts) == 4:
                         parts[3] = "255"
@@ -117,7 +136,7 @@ class DiscoveryService:
             try:
                 data, addr = sock.recvfrom(2048)
                 msg = json.loads(data.decode("utf-8"))
-                if msg.get("type") == "beacon" and msg.get("role") != self.role:
+                if msg.get("type") == "beacon" and is_opposite_role(self.role, msg.get("role", "")):
                     key = f"{msg.get('ip')}:{msg.get('port')}"
                     msg["last_seen"] = time.time()
                     msg["remote_addr"] = addr[0]

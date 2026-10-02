@@ -145,7 +145,7 @@ class MainWindow(QMainWindow):
         # Connection State
         self.is_linked = False
         self.discovered_peers = {}
-        self.target_peer_ip = "127.0.0.1"
+        self.target_peer_ip = ""
         self.target_peer_name = ""
 
         # Background Services
@@ -323,11 +323,29 @@ class MainWindow(QMainWindow):
             self.is_linked = True
             self._set_ui_linked(True)
         else:
-            if self.target_peer_ip:
-                self._connect_standby_receiver(self.target_peer_ip)
-                if self.receiver_client:
-                    self.receiver_client.send_link_request()
-                self._open_laptop_monitor()
+            ip = self.target_peer_ip
+            if not ip or ip == "127.0.0.1":
+                from PyQt6.QtWidgets import QInputDialog
+                last_ip = self.cfg.get("last_pc_ip", "")
+                text, ok = QInputDialog.getText(
+                    self,
+                    "Connect to PC Host",
+                    "Enter Host PC IP Address (e.g. 172.20.x.x):",
+                    text=last_ip
+                )
+                if ok and text.strip():
+                    ip = text.strip()
+                    self.target_peer_ip = ip
+                    self.target_peer_name = f"PC ({ip})"
+                    self.cfg["last_pc_ip"] = ip
+                    save_config(self.cfg)
+                else:
+                    return
+
+            self._connect_standby_receiver(ip)
+            if self.receiver_client:
+                self.receiver_client.send_link_request()
+            self._open_laptop_monitor()
 
     def _do_delink(self):
         if self.current_role == "pc":
@@ -404,9 +422,10 @@ class MainWindow(QMainWindow):
     def _on_peer_found(self, peer: dict):
         key = f"{peer.get('ip')}:{peer.get('port')}"
         self.discovered_peers[key] = peer
-        if self.current_role == "laptop" and not self.is_linked:
+        peer_role = peer.get("role", "")
+        if self.current_role == "laptop" and peer_role in ("pc", "host", "sender", "both") and not self.is_linked:
             self.target_peer_ip = peer.get("ip")
-            self.target_peer_name = peer.get("hostname", "PC")
+            self.target_peer_name = peer.get("hostname", "PC Host")
             self._connect_standby_receiver(self.target_peer_ip)
 
     def _on_peer_lost(self, peer: dict):
@@ -417,8 +436,8 @@ class MainWindow(QMainWindow):
         if self.is_linked:
             return
 
-        target_role = "receiver" if self.current_role == "pc" else "host"
-        matching_peers = [p for p in self.discovered_peers.values() if p.get("role") in (target_role, "both")]
+        target_roles = ("laptop", "receiver", "client") if self.current_role == "pc" else ("pc", "host", "sender")
+        matching_peers = [p for p in self.discovered_peers.values() if p.get("role") in target_roles or p.get("role") == "both"]
 
         if matching_peers:
             peer = matching_peers[0]
