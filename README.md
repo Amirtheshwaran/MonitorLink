@@ -8,7 +8,8 @@ Turn any spare Windows laptop into a high-refresh wireless or wired secondary mo
 [![Forks](https://img.shields.io/github/forks/Amirtheshwaran/MonitorLink?style=flat&color=blue)](https://github.com/Amirtheshwaran/MonitorLink/network/members)
 [![Issues](https://img.shields.io/github/issues/Amirtheshwaran/MonitorLink?style=flat&color=green)](https://github.com/Amirtheshwaran/MonitorLink/issues)
 [![Discussions](https://img.shields.io/github/discussions/Amirtheshwaran/MonitorLink?style=flat&color=purple)](https://github.com/Amirtheshwaran/MonitorLink/discussions)
-[![Roadmap](https://img.shields.io/badge/roadmap-public%20milestones-indigo.svg)](https://github.com/Amirtheshwaran/MonitorLink/milestones)
+[![Project Board](https://img.shields.io/badge/project-board-indigo.svg)](https://github.com/users/Amirtheshwaran/projects/1)
+[![Roadmap](https://img.shields.io/badge/roadmap-milestones-blueviolet.svg)](https://github.com/Amirtheshwaran/MonitorLink/milestones)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue.svg)](#requirements-and-platform)
 
