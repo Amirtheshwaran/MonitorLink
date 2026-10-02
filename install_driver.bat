@@ -7,15 +7,15 @@ echo.
 
 :: 1. Install driver certificate to Trusted Stores
 echo [1/3] Adding certificate to Root and Trusted Publishers...
-certutil -addstore -f root "C:\Users\Amirthesh\Desktop\Monitor software\driver\VirtualDisplayDriver\Virtual_Display_Driver.cer" >nul 2>&1
-certutil -addstore -f TrustedPublisher "C:\Users\Amirthesh\Desktop\Monitor software\driver\VirtualDisplayDriver\Virtual_Display_Driver.cer" >nul 2>&1
+certutil -addstore -f root "%~dp0driver\VirtualDisplayDriver\Virtual_Display_Driver.cer" >nul 2>&1
+certutil -addstore -f TrustedPublisher "%~dp0driver\VirtualDisplayDriver\Virtual_Display_Driver.cer" >nul 2>&1
 
 :: 2. Install device and driver using NefCon
 echo [2/3] Registering Virtual Display device...
-if exist "C:\Users\Amirthesh\Desktop\Monitor software\driver\nefcon\x64\nefconw.exe" (
-    "C:\Users\Amirthesh\Desktop\Monitor software\driver\nefcon\x64\nefconw.exe" install "C:\Users\Amirthesh\Desktop\Monitor software\driver\VirtualDisplayDriver\MttVDD.inf" "Root\MttVDD"
+if exist "%~dp0driver\nefcon\x64\nefconw.exe" (
+    "%~dp0driver\nefcon\x64\nefconw.exe" install "%~dp0driver\VirtualDisplayDriver\MttVDD.inf" "Root\MttVDD"
 ) else (
-    pnputil /add-driver "C:\Users\Amirthesh\Desktop\Monitor software\driver\VirtualDisplayDriver\MttVDD.inf" /install
+    pnputil /add-driver "%~dp0driver\VirtualDisplayDriver\MttVDD.inf" /install
 )
 
 :: 3. Scan for hardware changes

@@ -14,6 +14,7 @@ import time
 from typing import Callable, Optional
 import websockets
 from websockets.server import WebSocketServerProtocol
+from PyQt6.QtCore import QObject, pyqtSignal
 from core.capture import ScreenCapture, WindowCapture
 from core.input_handler import InputHandler
 
@@ -22,17 +23,22 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 
 
-class HostStreamer:
+class HostStreamer(QObject):
+    client_connected = pyqtSignal(object)
+    client_disconnected = pyqtSignal(object)
+    delink_received = pyqtSignal(str)
+
     def __init__(
         self,
         port: int = 8765,
         target_fps: int = 60,
-        quality: int = 75,
+        quality: int = 85,
         target_res: tuple[int, int] = (1920, 1080),
         on_client_connected: Optional[Callable] = None,
         on_client_disconnected: Optional[Callable] = None,
         on_delink_received: Optional[Callable] = None,
     ):
+        super().__init__()
         self.port = port
         self.target_fps = target_fps
         self.quality = quality
@@ -88,19 +94,33 @@ class HostStreamer:
         self.display_index = output_idx
         if self.capturer:
             self.capturer.release()
+            self.capturer = None
+
+        width, height = self.target_res
+        try:
+            from core.virtual_display import VirtualDisplayManager
+            displays = VirtualDisplayManager.get_all_displays()
+            if 0 <= output_idx < len(displays):
+                disp = displays[output_idx]
+                width = disp.get("width", width)
+                height = disp.get("height", height)
+        except Exception as e:
+            logger.warning(f"Failed to query display {output_idx} resolution: {e}")
+
         self.capturer = ScreenCapture(
             output_idx=output_idx,
-            target_width=self.target_res[0],
-            target_height=self.target_res[1],
+            target_width=width,
+            target_height=height,
             quality=self.quality
         )
-        logger.info(f"Streamer source switched to display index {output_idx}")
+        logger.info(f"Streamer source switched to display index {output_idx} ({width}x{height})")
 
     def set_source_window(self, hwnd: int):
         self.capture_mode = "window"
         self.window_hwnd = hwnd
         if self.capturer:
             self.capturer.release()
+            self.capturer = None
         self.capturer = WindowCapture(
             hwnd=hwnd,
             target_width=self.target_res[0],
@@ -130,9 +150,12 @@ class HostStreamer:
                 pass
 
     def _run_server(self):
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self._main_async())
+        try:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            self._loop.run_until_complete(self._main_async())
+        except Exception as e:
+            logger.error(f"HostStreamer server loop error: {e}")
 
     async def _main_async(self):
         # Initialize default capturer
@@ -203,14 +226,24 @@ class HostStreamer:
             self.stream_clients.add(websocket)
             logger.info(f"Stream client connected: {websocket.remote_address}")
             if self.on_client_connected:
-                self.on_client_connected(websocket.remote_address)
+                try:
+                    self.on_client_connected(websocket.remote_address)
+                except Exception as e:
+                    logger.debug(f"on_client_connected error: {e}")
+            self.client_connected.emit(websocket.remote_address)
             try:
                 await websocket.wait_closed()
+            except Exception:
+                pass
             finally:
                 self.stream_clients.discard(websocket)
                 logger.info(f"Stream client disconnected: {websocket.remote_address}")
                 if self.on_client_disconnected:
-                    self.on_client_disconnected(websocket.remote_address)
+                    try:
+                        self.on_client_disconnected(websocket.remote_address)
+                    except Exception as e:
+                        logger.debug(f"on_client_disconnected error: {e}")
+                self.client_disconnected.emit(websocket.remote_address)
 
         elif clean_path == "/control":
             self.control_clients.add(websocket)
@@ -222,6 +255,8 @@ class HostStreamer:
                         await self._handle_control_message(websocket, data)
                     except Exception as e:
                         logger.error(f"Error handling control message: {e}")
+            except Exception:
+                pass
             finally:
                 self.control_clients.discard(websocket)
 
@@ -240,17 +275,32 @@ class HostStreamer:
             # Automatically start streaming and activate monitor on client
             await websocket.send(json.dumps({"type": "activate_monitor"}))
             if self.on_client_connected:
-                self.on_client_connected(websocket.remote_address)
+                try:
+                    self.on_client_connected(websocket.remote_address)
+                except Exception as e:
+                    logger.debug(f"on_client_connected error: {e}")
+            self.client_connected.emit(websocket.remote_address)
 
         elif msg_type == "delink":
-            logger.info("Delink requested by client")
+            reason = data.get("reason", "client_delink")
+            logger.info(f"Delink requested by client: {reason}")
             if self.on_delink_received:
-                self.on_delink_received(data.get("reason", "client_delink"))
+                try:
+                    self.on_delink_received(reason)
+                except Exception as e:
+                    logger.debug(f"on_delink_received error: {e}")
+            self.delink_received.emit(reason)
             # Confirm delink
-            await websocket.send(json.dumps({"type": "delink_ack"}))
+            try:
+                await websocket.send(json.dumps({"type": "delink_ack"}))
+            except Exception:
+                pass
             # Also notify stream clients to close
             for s in list(self.stream_clients):
-                await s.close()
+                try:
+                    await s.close()
+                except Exception:
+                    pass
 
         elif msg_type == "ping":
             await websocket.send(json.dumps({"type": "pong", "time": data.get("time")}))

@@ -42,7 +42,7 @@ except Exception:
 
 
 class ScreenCapture:
-    def __init__(self, output_idx: int = 0, target_width: int = 1920, target_height: int = 1080, quality: int = 75):
+    def __init__(self, output_idx: int = 0, target_width: int = 1920, target_height: int = 1080, quality: int = 85):
         self.output_idx = output_idx
         self.target_width = target_width
         self.target_height = target_height
@@ -50,33 +50,54 @@ class ScreenCapture:
         self.cam = None
         self.use_dxgi = True
         self.running = False
+        self._last_frame = None
+        self._last_frame_time = 0.0
         self._init_dxgi()
 
     def _init_dxgi(self):
         ensure_input_desktop()
         try:
             import bettercam
-            self.cam = bettercam.create(output_idx=self.output_idx, max_buffer_len=2)
+            self.cam = bettercam.create(output_idx=self.output_idx, output_color="BGR", max_buffer_len=2)
             self.use_dxgi = True
-            logger.info(f"Initialized DXGI Desktop Duplication on output {self.output_idx}")
+            logger.info(f"Initialized DXGI Desktop Duplication on output {self.output_idx} (BGR format)")
         except Exception as e:
             logger.warning(f"DXGI init failed on output {self.output_idx} ({e}), falling back to GDI.")
             self.use_dxgi = False
             self.cam = None
 
     def grab_frame(self) -> np.ndarray | None:
-        """Capture one raw RGB/BGR frame."""
+        """Capture one raw BGR frame."""
         if self.use_dxgi and self.cam is not None:
             try:
                 frame = self.cam.grab()
                 if frame is not None:
+                    self._last_frame = frame
+                    self._last_frame_time = time.time()
                     return frame
+
+                # If screen is idle, return a keepalive frame once per second
+                now = time.time()
+                if self._last_frame is not None and (now - self._last_frame_time) > 1.0:
+                    self._last_frame_time = now
+                    return self._last_frame
+                return None
             except Exception as e:
                 logger.debug(f"DXGI grab error: {e}, falling back to GDI")
                 self.use_dxgi = False
+                if self.cam is not None:
+                    try:
+                        self.cam.release()
+                    except Exception:
+                        pass
+                    self.cam = None
 
-        # Fallback to Win32 GDI
-        return self._grab_gdi()
+        # Fallback to Win32 GDI only if DXGI failed / disabled
+        frame = self._grab_gdi()
+        if frame is not None:
+            self._last_frame = frame
+            self._last_frame_time = time.time()
+        return frame
 
     def _grab_gdi(self) -> np.ndarray | None:
         try:

@@ -309,10 +309,10 @@ class MainWindow(QMainWindow):
     def _init_services(self):
         self.discovery = DiscoveryService(
             role=self.current_role,
-            service_port=8765,
-            on_device_found=self._on_peer_found,
-            on_device_lost=self._on_peer_lost
+            service_port=8765
         )
+        self.discovery.device_found.connect(self._on_peer_found)
+        self.discovery.device_lost.connect(self._on_peer_lost)
         self.discovery.start()
 
         if self.current_role == "pc":
@@ -346,11 +346,11 @@ class MainWindow(QMainWindow):
         self.host_streamer = HostStreamer(
             port=8765,
             target_fps=60,
-            quality=self.cfg.get("quality", 75),
-            on_client_connected=self._on_client_linked,
-            on_client_disconnected=self._on_client_unlinked,
-            on_delink_received=self._on_remote_delink
+            quality=self.cfg.get("quality", 85)
         )
+        self.host_streamer.client_connected.connect(self._on_client_linked)
+        self.host_streamer.client_disconnected.connect(self._on_client_unlinked)
+        self.host_streamer.delink_received.connect(self._on_remote_delink)
         self.host_streamer.set_source_display(source_idx)
         self.host_streamer.start()
 

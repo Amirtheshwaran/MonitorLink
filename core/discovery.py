@@ -11,6 +11,7 @@ import threading
 import logging
 import ipaddress
 import psutil
+from PyQt6.QtCore import QObject, pyqtSignal
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,12 @@ def get_local_ip_addresses() -> list[dict]:
     return results
 
 
-class DiscoveryService:
+class DiscoveryService(QObject):
+    device_found = pyqtSignal(dict)
+    device_lost = pyqtSignal(dict)
+
     def __init__(self, role: str, service_port: int, on_device_found=None, on_device_lost=None):
+        super().__init__()
         self.role = role  # "host" or "receiver"
         self.service_port = service_port
         self.hostname = socket.gethostname()
@@ -147,8 +152,13 @@ class DiscoveryService:
 
                     is_new = key not in self.discovered_devices
                     self.discovered_devices[key] = msg
-                    if is_new and self.on_device_found:
-                        self.on_device_found(msg)
+                    if is_new:
+                        if self.on_device_found:
+                            try:
+                                self.on_device_found(msg)
+                            except Exception as e:
+                                logger.debug(f"on_device_found callback error: {e}")
+                        self.device_found.emit(msg)
             except socket.timeout:
                 continue
             except Exception as e:
@@ -165,8 +175,13 @@ class DiscoveryService:
 
             for key in to_remove:
                 lost_dev = self.discovered_devices.pop(key, None)
-                if lost_dev and self.on_device_lost:
-                    self.on_device_lost(lost_dev)
+                if lost_dev:
+                    if self.on_device_lost:
+                        try:
+                            self.on_device_lost(lost_dev)
+                        except Exception as e:
+                            logger.debug(f"on_device_lost callback error: {e}")
+                    self.device_lost.emit(lost_dev)
             time.sleep(1.0)
 
     def get_devices(self) -> list[dict]:

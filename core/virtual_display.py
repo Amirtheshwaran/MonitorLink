@@ -19,30 +19,61 @@ NEFCON_EXE = os.path.join(BASE_DIR, "driver", "nefcon", "x64", "nefconw.exe")
 class VirtualDisplayManager:
     @staticmethod
     def get_all_displays() -> list[dict]:
-        """List all active Windows display monitors with resolution and coordinates."""
+        """List all active Windows display monitors in exact Windows Display Settings order."""
         displays = []
         try:
-            for i in range(10):
+            # Query Windows Desktop Monitor topology order
+            monitor_order = {}
+            try:
+                for m_idx, (hmon, hdc, rect) in enumerate(win32api.EnumDisplayMonitors()):
+                    info = win32api.GetMonitorInfo(hmon)
+                    dev_name = info.get("Device")
+                    if dev_name:
+                        monitor_order[dev_name] = {
+                            "order": m_idx,
+                            "rect": rect,
+                            "is_primary": bool(info.get("Flags", 0) & 1),
+                        }
+            except Exception as e:
+                logger.debug(f"EnumDisplayMonitors error: {e}")
+
+            for i in range(64):
                 try:
                     dev = win32api.EnumDisplayDevices(None, i)
                     if not dev:
-                        break
+                        continue
                     if dev.StateFlags & win32con.DISPLAY_DEVICE_ATTACHED_TO_DESKTOP:
                         settings = win32api.EnumDisplaySettings(dev.DeviceName, win32con.ENUM_CURRENT_SETTINGS)
                         is_primary = bool(dev.StateFlags & win32con.DISPLAY_DEVICE_PRIMARY_DEVICE)
+                        m_info = monitor_order.get(dev.DeviceName, {})
+                        sort_key = m_info.get("order", 99 if not is_primary else -1)
+
+                        w = settings.PelsWidth if settings else 1920
+                        h = settings.PelsHeight if settings else 1080
+                        freq = settings.DisplayFrequency if settings else 60
+                        x = settings.Position_x if settings else m_info.get("rect", [0, 0, 0, 0])[0]
+                        y = settings.Position_y if settings else m_info.get("rect", [0, 0, 0, 0])[1]
+
                         displays.append({
-                            "index": len(displays),
                             "device_name": dev.DeviceName,
                             "friendly_name": dev.DeviceString,
-                            "is_primary": is_primary,
-                            "width": settings.PelsWidth if settings else 1920,
-                            "height": settings.PelsHeight if settings else 1080,
-                            "frequency": settings.DisplayFrequency if settings else 60,
-                            "x": settings.Position_x if settings else 0,
-                            "y": settings.Position_y if settings else 0,
+                            "is_primary": is_primary or m_info.get("is_primary", False),
+                            "width": w,
+                            "height": h,
+                            "frequency": freq,
+                            "x": x,
+                            "y": y,
+                            "_sort_key": sort_key,
                         })
                 except Exception:
-                    break
+                    continue
+
+            # Sort matching Windows Display Settings order (Primary first, then monitor order 2, 3...)
+            displays.sort(key=lambda d: (0 if d.get("is_primary") else 1, d.get("_sort_key", 99), d.get("x", 0)))
+            for idx, d in enumerate(displays):
+                d["index"] = idx
+                d.pop("_sort_key", None)
+
         except Exception as e:
             logger.error(f"Error enumerating displays: {e}")
 
